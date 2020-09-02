@@ -42,39 +42,39 @@ smarty_client = get_smarty_streets_client(SMARTY_ID, SMARTY_TOKEN)
 @app.route('/orders', methods=['POST'])
 def orders_endpoint():
     hook_body = app.current_request.json_body
-    send_sns_notification(sns_client,  ORDERS_TOPIC, hook_body, serialize=True)
+    send_sns_notification(sns_client, ORDERS_TOPIC, hook_body, serialize=True)
     return Response(body='Thanks red rover!',
                     status_code=200,
                     headers={'Content-Type': 'text/plain'})
 
 
-@app.on_sns_message(topic= ORDERS_TOPIC)
+@app.on_sns_message(topic=ORDERS_TOPIC)
 def verify_customers_residential(event):
     customer = json.loads(event.message)['customer']
     unknown = customer_is_unknown(customer)
     residential = customer_is_residential(client=smarty_client, customer=customer)
     if unknown and residential:
-        return send_sns_notification(sns_client,  CUSTOMER_NEEDS_TAGGING, 
+        return send_sns_notification(sns_client, CUSTOMER_NEEDS_TAGGING, 
                                      customer, serialize=True)
     elif unknown and not residential:
-        return send_sns_notification(sns_client,  CUSTOMER_UNKNOWN, 
+        return send_sns_notification(sns_client, CUSTOMER_UNKNOWN, 
                                      customer, serialize=True)
 
 
-@app.on_sns_message(topic= CUSTOMER_NEEDS_TAGGING)
+@app.on_sns_message(topic=CUSTOMER_NEEDS_TAGGING)
 def tag_customer(event):
     customer = json.loads(event.message)
     return tag_customer_retail(shopify_client, customer)
 
 
-@app.on_sns_message(topic= CUSTOMER_UNKNOWN)
+@app.on_sns_message(topic=CUSTOMER_UNKNOWN)
 def verify_likely_retail(event):
     customer = json.loads(event.message)
     if pass_retail_verification(funcs_to_apply=[email_not_retail,
                                                 name_not_retail, spending_not_retail], 
                                                 customer=customer,
                                                 spending_threshhold=SPENDING_THRESHHOLD):
-        return send_sns_notification(sns_client,  CUSTOMER_NEEDS_TAGGING, 
+        return send_sns_notification(sns_client, CUSTOMER_NEEDS_TAGGING, 
                                      customer, serialize=True)
     return send_ses_message(ses_client, SES_TO_ADDR, create_unknown_customer_msg, 
                             formatted_customer_info(customer))
